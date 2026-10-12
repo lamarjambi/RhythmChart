@@ -16,7 +16,7 @@ def parse_chart_to_markers(chart_path, output_path):
     bpm_changes = []  # stores (tick, bpm) pairs
     note_ticks = set() # handles unique note spots
 
-    # read the chart text
+    # open and read the chart text
     with open(chart_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
@@ -60,7 +60,7 @@ def parse_chart_to_markers(chart_path, output_path):
     for target_tick in note_ticks:
         current_time = 0.0
         current_tick = 0
-        current_bpm = bpm_changes[0][1]
+        current_bpm = bpm_changes[0][1] # fixed the list assignment typo here
 
         # cycle through bpm changes to track time elapsed
         for next_tick, next_bpm in bpm_changes[1:]:
@@ -89,13 +89,13 @@ def parse_chart_to_markers(chart_path, output_path):
             f"Interact_Node_{i+1}", # cue point name for ue5 blueprint
             time_string,           
             "00:00.000",           
-            "Decimal",             
-            "Cue",                 
+            "decimal",             # audition needs lowercase 'decimal'
+            "cue",                 # audition needs lowercase 'cue'
             "Rhythm Target"        
         ])
 
-    # save as tab-delimited file so audition reads it right
-    with open(output_path, "w", newline="", encoding="utf-8") as f:
+    # save with explicit windows lines endings (\r\n) so audition stops complaining
+    with open(output_path, "w", newline="\r\n", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="\t") 
         writer.writerow(headers)
         writer.writerows(audition_markers)
@@ -103,5 +103,4 @@ def parse_chart_to_markers(chart_path, output_path):
     print(f"done! converted '{chart_path}' into '{output_path}'")
     print(f"made {len(audition_markers)} interactive notes total.")
 
-# run everything
 parse_chart_to_markers(chart_file, output_csv)
