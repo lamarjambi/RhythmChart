@@ -6,14 +6,21 @@ Marker label format:  N<index>_L<lanes>
   N13_L02   -> note #13, chord on lanes 0 and 2
 UE reads the label via the MetaSound Wave Player's "Cue Point Label" output.
 
-Usage:  python chart_to_markers.py notes.chart audition_markers.csv
+Usage:  python generate_chart.py                                    (asks for everything)
+        python generate_chart.py notes.chart out.csv HardSingle     (skips the questions)
 """
 import csv
 import re
 import sys
 
 # --- config ---
-DIFFICULTY = "MediumSingle"     # EasySingle / MediumSingle / HardSingle / ExpertSingle
+DIFFICULTIES = {
+    "1": ("EasySingle",   "fewest notes, mostly single frets"),
+    "2": ("MediumSingle", "more notes, some chords"),
+    "3": ("HardSingle",   "dense, frequent chords"),
+    "4": ("ExpertSingle", "every note the charter placed"),
+}
+DEFAULT_DIFFICULTY = "2"
 # Clone Hero frets: 0 green, 1 red, 2 yellow, 3 blue, 4 orange, 7 open. 5/6 = modifiers (ignored).
 FRET_TO_LANE = {0: 0, 1: 1, 2: 2, 3: 3, 4: 3}   # orange folds into lane 3; open (7) dropped
 MIN_GAP_SEC = 0.75 # drops notes closer than 0.75s apart           
@@ -26,7 +33,7 @@ def section(content, name):
     return m.group(1).splitlines()
 
 
-def main(chart_path, out_path):
+def main(chart_path, out_path, difficulty):
     content = open(chart_path, encoding="utf-8-sig", errors="ignore").read()
 
     res = int(re.search(r"Resolution\s*=\s*(\d+)", content).group(1))
@@ -43,7 +50,7 @@ def main(chart_path, out_path):
 
     # tick -> set of lanes
     notes = {}
-    for line in section(content, DIFFICULTY):
+    for line in section(content, difficulty):
         m = re.match(r"\s*(\d+)\s*=\s*N\s+(\d+)", line)
         if m and int(m.group(2)) in FRET_TO_LANE:
             notes.setdefault(int(m.group(1)), set()).add(FRET_TO_LANE[int(m.group(2))])
@@ -76,6 +83,29 @@ def main(chart_path, out_path):
     print(f"{len(rows)} markers -> {out_path} | notes per lane 0-3: {counts}")
 
 
+def ask(prompt, hint, default=None):
+    while True:
+        answer = input(f"{prompt} ({hint}): ").strip().strip('"')
+        if answer or default:
+            return answer or default
+        print("  Please enter a value.")
+
+
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "notes.chart",
-         sys.argv[2] if len(sys.argv) > 2 else "audition_markers.csv")
+    chart_path = sys.argv[1] if len(sys.argv) > 1 else ask("Chart file to read", "e.g. notes.chart")
+    out_path = sys.argv[2] if len(sys.argv) > 2 else ask("Output CSV name", "e.g. audition_markers.csv")
+    if not out_path.lower().endswith(".csv"):
+        out_path += ".csv"
+
+    if len(sys.argv) > 3:
+        difficulty = sys.argv[3]
+    else:
+        print("\nDifficulty (which note track to pull from the chart; MIN_GAP_SEC thins it further):")
+        for key, (name, desc) in DIFFICULTIES.items():
+            print(f"  {key}) {name:<13} {desc}")
+        choice = ask("Pick 1-4", f"Enter = {DEFAULT_DIFFICULTY}", DEFAULT_DIFFICULTY)
+        if choice not in DIFFICULTIES:
+            raise SystemExit(f"FAIL: '{choice}' is not one of 1-4")
+        difficulty = DIFFICULTIES[choice][0]
+
+    main(chart_path, out_path, difficulty)
